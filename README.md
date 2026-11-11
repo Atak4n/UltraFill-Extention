@@ -1,67 +1,67 @@
 # UltraFill
 
-Bağımlılıksız, build gerektirmeyen MV3 WebExtension. Sıfırdan yazılmıştır; üçüncü taraf eklenti kodu kullanılmaz. Modlar: kapalı, doğrusal germe, esnek germe. Varsayılan doğrusal germedir (`stretch`); kayıtlı `off` seçimi korunur. Popup ayarları tüm sekmelere uygulanır; Alt+Shift+F mod döndürür.
+Dependency-free, no-build MV3 WebExtension. Written from scratch; no third-party extension code is used. Modes: off, linear stretch, flex stretch. Default is linear stretch (`stretch`); a saved `off` selection is preserved. Popup settings apply to all tabs; Alt+Shift+F cycles the mode.
 
 ## Chrome / Edge
 
-1. `chrome://extensions` (Edge: `edge://extensions`) sayfasını açın.
-2. **Geliştirici modu** → **Paketlenmemiş yükle** → bu repo klasörünü seçin.
-3. Önceden açık video sekmelerini yenileyin. Popup’tan modu seçin.
+1. Open `chrome://extensions` (Edge: `edge://extensions`).
+2. **Developer mode** → **Load unpacked** → select this repo folder.
+3. Reload any already-open video tabs. Pick the mode from the popup.
 
 ## Safari (macOS)
 
-1. `safari.zip` dosyasını açın.
-2. `UltraFill.xcodeproj`'u Xcode ile açın; gerekirse Signing takımını seçin.
-3. Xcode'da **⌘R** ile çalıştırın.
-4. **Safari → Ayarlar → Uzantılar** altında UltraFill’i etkinleştirip site erişimi verin.
-5. Gerekirse Safari'de **Geliştirme menüsü → İmzasız uzantılara izin ver** seçin. Menü adları Safari sürümüne göre değişebilir.
+1. Open `safari.zip`.
+2. Open `UltraFill.xcodeproj` in Xcode; select your Signing team if needed.
+3. Run with **⌘R** in Xcode.
+4. Under **Safari → Settings → Extensions**, enable UltraFill and grant it site access.
+5. If needed, in Safari choose **Develop menu → Allow Unsigned Extensions**. Menu names may vary by Safari version.
 
-`safari.zip` içindeki kaynaklar (`Resources/`) kök klasördeki eklenti dosyalarıyla aynıdır. Safari sürümünün MV3 service worker desteği gerekir.
+The resources inside `safari.zip` (`Resources/`) are identical to the extension files in the repo root. Requires a Safari version with MV3 service worker support.
 
-## Eşleme
+## Mapping
 
-Kaynak koordinatı `s ∈ [-1,1]`, ekran koordinatı `x`:
+Source coordinate `s ∈ [-1,1]`, screen coordinate `x`:
 
 `x = s * (k + (1-k) * s²)`
 
-`k = 1 - güç * (1 - min(1, kaynakOranı/hedefOranı))`
+`k = 1 - strength * (1 - min(1, sourceAspect/targetAspect))`
 
-Tam güçte merkezde fiziksel ölçek `(hedefOranı/kaynakOranı)*k = 1`; kenarlara doğru germe artar. Türev `k + 3*(1-k)*s² > 0`; uçlar sabit, kırpma yok. Shader ekran→kaynak örneklemesi için bu monoton fonksiyonun tersini 14 adımlı ikili aramayla bulur. Eğriyi doğrudan ekran→kaynak yönünde kullanmak merkezi korumaz. Geçersiz değerler doğrusal eşlemeye düşer. Daha dar hedefte doğrusal doldurma kullanılır.
+At full strength, the physical scale at the center `(targetAspect/sourceAspect)*k = 1`; stretch increases toward the edges. Derivative `k + 3*(1-k)*s² > 0`; the edges are fixed, no cropping occurs. For screen→source sampling, the shader finds the inverse of this monotonic function via a 14-step binary search. Using the curve directly in the screen→source direction would not preserve the center. Invalid values fall back to linear mapping. A narrower target uses linear fill.
 
-## Sınırlar
+## Limits
 
-- DRM/EME, CORS engeli, shader/WebGL hatası: doğrusal fallback. Popup etkin sekmenin frame durumunu yaklaşık 2 saniye gecikmeyle gösterir. Worker yeniden başladıysa durum bir sonraki bildirime kadar boş olabilir.
-- Doğrusal mod `object-fit: fill` kullanır: `scaleX` gibi görüntüyü doğrusal gerer, ancak yerel kontrolleri ölçeklemez.
-- Yerel video kontrolleri veya video öğesinin doğrudan tam ekranı: yalnız `object-fit: fill` (geometri değişmez); opacity ile yerel kontrolleri gizlemez.
-- Geometri kuralı: video kutusu hedef alanı (tam ekran öğesi, `html`/`body` ise görüntü alanı, tam ekran dışında bilinen oynatıcı kapsayıcısı) zaten kaplıyorsa yalnız `object-fit: fill` uygulanır. Kaplamıyorsa yalnız videonun dal zinciri hedefe yayılır. Tam ekran dışında kapsayıcı bulunamazsa sayfa geometrisine dokunulmaz. Kapsayıcı seçicileri `content.js` içindeki tek `PLAYERS` sabitindedir; eşleşmese de genel kural çalışır. Gerçek Chrome/Safari ve site testi (YouTube, Netflix, Prime, Apple TV+, Disney+) henüz yapılmadı.
-- Her frame kendi en büyük görünür, tercihen oynayan videosunu seçer. Cross-origin frame’ler arasında tek global video seçimi yapılmaz. Açık (open) shadow DOM taranır; kapalı (closed) shadow root’lara erişilemez, içindeki video bulunamaz. Picture-in-picture ve tarayıcı iç sayfaları desteklenmez.
-- Videonun içine kodlanmış siyah bantlar kaldırılmaz; kırpmama ilkesi gereği korunur. Piksel erişiminin sessizce siyah görüntü verdiği korumalı akışlar her tarayıcıda saptanamayabilir.
-- Duraklama ve gizli sekmede sürekli render durur. Canvas DPR en fazla 2. Esnek mod GPU kullanır ve kenarları bilerek bozar.
-- Ağ isteği, telemetri veya dış sunucu yok. `<all_urls>` video bulmak içindir; site iznini tarayıcı ayarlarından daraltabilirsiniz.
+- DRM/EME, a CORS block, or a shader/WebGL error: falls back to linear. The popup shows the active tab's frame state with roughly a 2-second delay. If the worker restarted, the state may stay empty until the next notification.
+- Linear mode uses `object-fit: fill`: it stretches the image linearly, like `scaleX`, but does not scale native controls.
+- When native video controls are used, or the video element itself goes fullscreen: only `object-fit: fill` is applied (geometry unchanged); native controls are not hidden via opacity.
+- Geometry rule: if the video box already covers the target area (the fullscreen element, the viewport if it is `html`/`body`, or the known player container outside fullscreen), only `object-fit: fill` is applied. If it does not cover it, only the video's ancestor chain is spread to the target. Outside fullscreen, if no container is found, page geometry is left untouched. Container selectors live in the single `PLAYERS` constant in `content.js`; the general rule still works even without a match. Real Chrome/Safari and site testing (YouTube, Netflix, Prime, Apple TV+, Disney+) has not been done yet.
+- Each frame picks its own largest visible, preferably playing video. There is no single global video selection across cross-origin frames. Open shadow DOM is scanned; closed shadow roots cannot be accessed, so videos inside them cannot be found. Picture-in-picture and browser internal pages are not supported.
+- Black bars baked into the video itself are not removed; this is preserved per the no-cropping principle. Protected streams that silently return a black image on pixel access may not be detectable in every browser.
+- Rendering stops continuously on pause and in hidden tabs. Canvas DPR is capped at 2. Flex mode uses the GPU and deliberately distorts the edges.
+- No network requests, telemetry, or external servers. `<all_urls>` is only for finding video; you can narrow the site permission from your browser settings.
 
-## Panel (eklenti penceresi) ve düğmeler (v1.1.1)
+## Panel (extension window) and buttons (v1.1.1)
 
-- Pencere `storage.local`'a yazar, etkin sekme anında uygular. Etkin sekmenin host'u ve video/DRM durumu mevcut `status` mesajlaşmasıyla `background.js` üzerinden gelir (yeni izin yok); alınamazsa alan "—" gösterir.
-- YouTube `.ytp-right-controls` içindeki düğme ve diğer sitelerde videonun üstündeki yüzen düğme yalnız tık ile mod döndürür (kapalı → doldur → esnek). Sağ tık/uzun basma yok. Tek kez eklenir, SPA'da kontrol çubuğu yenilenince geri gelir. Alt+Shift+F aynen çalışır.
-- 1.1.1 düzeltmesi: "Kapalı"ya geçince video sola yapışıyordu. Kök neden: doldururken `inset`/`margin` kısaltmaları yazılıyor, bunlar sitenin satır içi `left/top` değerlerini eziyordu; sökümde yalnız kısaltma siliniyor, `left/top` geri gelmiyordu. Artık uzun biçimler (`top/right/bottom/left`, `margin-*`) ayrı ayrı yazılıp geri alınır (`test/stale.test.mjs` A5, sahte CSSOM ile; gerçek Chrome'da doğrulanmadı). Doğrusal germe ve görüntü filtreleri çalışmaya devam eder.
-- Kapsam dışı (1.2.0): kare enterpolasyonu (1.3.0'da Akıcılık olarak eklendi, aşağıda).
-
-
-HDR güçlendirme (Görüntü sekmesi, varsayılan kapalı, güç %50):
-- Gerçek HDR çıkışı SAĞLAMAZ. Piksel okumadan, `--uf-filter` zincirine eklenen gizli SVG filtresiyle SDR ton eğrisi uygular (parlak tonlar açılır, gölgeler korunur, hafif doygunluk). Ekran `(dynamic-range: high)` ise panel "HDR ekran algılandı", değilse "SDR ekran: ton genişletme" der; ikisinde de çıktı aynı SDR filtredir.
-- Piksel okunmadığı için DRM/CORS'ta da uygulanır. Sınır: donanım korumalı oynatmada (ör. bazı DRM yolları) tarayıcı CSS/SVG filtresini yok sayabilir; bu durumda etki görünmez.
-- Nötr (kapalı veya güç 0) iken filtre, öznitelik ve SVG kalmaz.
+- The window writes to `storage.local`, and the active tab applies it instantly. The active tab's host and video/DRM state come through the existing `status` messaging via `background.js` (no new permission); if unavailable, the field shows "—".
+- The button inside YouTube's `.ytp-right-controls`, and the floating button above the video on other sites, cycles the mode with a single click only (Off → Fill → Flex). No right-click/long-press. Added once; reappears when the control bar is refreshed by an SPA. Alt+Shift+F still works the same way.
+- 1.1.1 fix: switching to "Off" caused the video to stick to the left. Root cause: while filling, the `inset`/`margin` shorthand properties were being written, which overrode the site's inline `left/top` values; on teardown only the shorthand was removed, so `left/top` was never restored. Now the longhand properties (`top/right/bottom/left`, `margin-*`) are written and reverted individually (`test/stale.test.mjs` A5, with a mock CSSOM; not verified in a real Chrome). Linear stretch and image filters keep working.
+- Out of scope (1.2.0): frame interpolation (added in 1.3.0 as Fluid, below).
 
 
-## Akıcılık (v1.3.0, deneysel, varsayılan kapalı)
+HDR boost (Image tab, off by default, strength 50%):
+- Does NOT provide real HDR output. Without reading any pixels, it applies an SDR tone curve (brightens highlights, preserves shadows, slight saturation boost) via a hidden SVG filter added to the `--uf-filter` chain. If the screen reports `(dynamic-range: high)`, the panel says "HDR screen detected", otherwise "SDR screen: tone expansion"; in both cases the output is the same SDR filter.
+- Because no pixels are read, it also applies under DRM/CORS. Limit: under hardware-protected playback (e.g. some DRM paths) the browser may ignore the CSS/SVG filter; in that case the effect is invisible.
+- When neutral (off, or strength 0), no filter, attribute, or SVG remains.
 
-Akıcılık sekmesi: düşük fps videoyu (24/30) yüksek yenileme hızlı ekranda (60/120/144 Hz) ara kareler üreterek akıcı gösterir. Panel "kaynak → çıkış FPS" (ör. `24 → 144`), işleme süresi / bütçe ms (bütçe = 1000 / yenileme hızı) ve durumu (Akıcı / Bütçe aşıldı / DRM: kullanılamaz ...) gösterir. Ayar `storage.local`'dadır, siteye özel geçersiz kılınabilir. Profiller bu ayara dokunmaz; Spor ve Oyun içeriği için açmanız önerilir, siz seçersiniz.
-- Yöntem: video karesi her yeni karede iki dokulu halkaya yüklenir; her ekran karesinde önceki ile şimdiki kare arasında `t` konumu çizilir. Yüksek kalite (yalnız WebGL2): 1/4 çözünürlükte 8x8 blok eşleme (±6 piksel, SAD) ile hareket alanı çıkarılır; iki kare `t·v` ve `(1−t)·v` kaydırılıp karıştırılır, eşleşmesi güvensiz bloklarda düz karışıma düşer. Düşük kalite (WebGL1 veya yedek): iki karenin düz karışımı (hayalet/çift görüntü görülebilir). Doldurma/esnek mod ve zoom/filtre canvas üzerinde korunur.
-- Gecikme: bir kaynak kare (24 fps'de ~42 ms, 30 fps'de ~33 ms). Görüntü sesten bu kadar geç kalır; panel yaklaşık değeri gösterir.
-- Sınır: DRM (`mediaKeys`), CORS'suz başka kökenli video, WebGL yok veya bağlam kaybı, video öğesinin kendisinin tam ekranı durumunda akıcılık kapanır; video CSS ile doldurmaya döner ve neden panelde yazar. DRM aşılmaz.
-- GPU yükü: canvas çözünürlüğü DPR ≤ 2 ve en çok 2560×1440; hareket kestirimi yalnız yeni video karesinde çalışır. Süre ölçümü CPU tarafıdır (GPU yürütmesini tam yansıtmaz); `EXT_disjoint_timer_query_webgl2` varsa GPU süresi de ölçülür. Bütçe aşılırsa kalite otomatik düşüğe iner ve yeniden yükselmez (kalite ayarını değiştirince sıfırlanır). Kaynak fps ekran hızına yakınsa kazanç olmaz, yalnız gecikme eklenir; kapatın. Duraklatma, gizli sekme ve `ended`'da çizim döngüsü durur.
 
-## Kontroller
+## Fluid (v1.3.0, experimental, off by default)
+
+The Fluid tab: makes a low-fps video (24/30) look smooth on a high-refresh-rate screen (60/120/144 Hz) by generating intermediate frames. The panel shows "source → output FPS" (e.g. `24 → 144`), processing time / budget ms (budget = 1000 / refresh rate), and a status (Fluid / Budget exceeded / DRM: unavailable ...). The setting lives in `storage.local` and can be overridden per site. Profiles do not touch this setting; enabling it is recommended for Sport and Game content, but it is your choice.
+- Method: each new video frame is loaded into two textured ring buffers; every screen frame draws position `t` between the previous and current frame. High quality (WebGL2 only): a motion field is extracted via 8x8 block matching (±6 pixels, SAD) at 1/4 resolution; the two frames are shifted by `t·v` and `(1−t)·v` and blended, falling back to a plain blend in blocks where the match is unreliable. Low quality (WebGL1 or fallback): a plain blend of the two frames (ghosting/double image possible). Fill/flex mode and zoom/filters are preserved on the canvas.
+- Latency: one source frame (~42 ms at 24 fps, ~33 ms at 30 fps). The image lags behind the audio by this much; the panel shows the approximate value.
+- Limit: Fluid turns off under DRM (`mediaKeys`), cross-origin video without CORS, no WebGL or a lost context, or when the video element itself is fullscreen; the video falls back to CSS fill and the reason is shown in the panel. DRM cannot be bypassed.
+- GPU load: canvas resolution is capped at DPR ≤ 2 and at most 2560×1440; motion estimation only runs on a new video frame. Timing is measured on the CPU side (does not fully reflect GPU execution); if `EXT_disjoint_timer_query_webgl2` is available, GPU time is measured too. If the budget is exceeded, quality automatically drops to low and does not rise again (changing the quality setting resets it). If the source fps is close to the screen's refresh rate there is no gain, only added latency; turn it off. The draw loop stops on pause, in hidden tabs, and on `ended`.
+
+## Checks
 
 ```sh
 node test/core.test.mjs
@@ -79,4 +79,4 @@ node test/hdr.test.mjs
 node --check content.js
 ```
 
-Elle: 16:9 test videosunda 21:9/32:9 konteyner, kenar işaretleri ve merkez dairesi; duraklat/devam, seek, SPA video değişimi, tam ekran, slider, iki sekme senkronizasyonu, kısayol, DRM/CORS fallback ve kapatıldığında özgün stillerin geri dönmesi. Gerçek tarayıcı/GPU doğrulaması bu otomatik testlerin kapsamında değildir.
+Manual: on a 16:9 test video, a 21:9/32:9 container, edge markers and a center circle; pause/resume, seek, SPA video change, fullscreen, slider, two-tab sync, shortcut, DRM/CORS fallback, and original styles being restored when turned off. Real browser/GPU verification is not covered by these automated tests.
