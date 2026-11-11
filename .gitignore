@@ -1,0 +1,8 @@
+.DS_Store
+safari/
+safari.bak/
+dist/
+build/
+xcuserdata/
+.claude/
+*.log

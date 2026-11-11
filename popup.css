@@ -1,0 +1,24 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 440px;
+  max-height: 600px;
+  overflow: hidden;
+  font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+  color: #1d1d1f;
+  background: linear-gradient(135deg, #f5f7fb 0%, #e2e8f0 100%);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html, body {
+    color: #f5f5f7;
+    background: radial-gradient(circle at 50% 0%, #1c2230 0%, #0d0f14 100%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html, body {
+    background: #12141a;
+  }
+}

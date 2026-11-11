@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "UltraFill",
+  "version": "1.3.0",
+  "description": "Videoyu kırpmadan doldur: doğrusal veya merkez korumalı esnek germe; ayarlar eklenti penceresinde.",
+  "permissions": ["storage"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html", "default_title": "UltraFill"},
+  "icons": {"16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png"},
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "all_frames": true,
+    "match_about_blank": true,
+    "js": ["mapping.js", "core.js", "effects.js", "panel.js", "fluid.js", "content.js"],
+    "run_at": "document_idle"
+  }],
+  "commands": {
+    "cycle-mode": {
+      "suggested_key": {"default": "Alt+Shift+F"},
+      "description": "UltraFill: kapalı → doğrusal → esnek"
+    }
+  }
+}
